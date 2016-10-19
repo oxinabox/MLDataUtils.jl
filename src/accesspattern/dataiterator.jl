@@ -82,33 +82,70 @@ see also
 
 `DataSubset`, `eachbatch`, `eachobs`, `shuffled`, `getobs`, `nobs`
 """
-immutable DataIterator{T,S<:Union{Int,UnitRange{Int}},R}
+immutable DataIterator{T, S<:Union{Int,AbstractVector}}
     data::T
     start::S
     count::Int
 end
 
-function DataIterator{T,S}(data::T, start::S = 1, count::Int = nobs(data))
-    R = typeof(datasubset(data,start))
-    DataIterator{T,S,R}(data,start,count)
-end
+DataIterator(data) = DataIterator(data, 1, nobs(data))
+# function DataIterator{T,S}(data::T, start::S = 1, count::Int = nobs(data))
+#     R = typeof(datasubset(data,start))
+#     DataIterator{T,S,R}(data,start,count)
+# end
+
+isbatches(iter::DataIterator) = isbatches(iter.start)
+
+isbatches(::Int)                               = false # eachobs
+isbatches(::UnitRange{Int})                    = true  # eachbatch
+isbatches(::AbstractVector{Int})               = false # was: DataSubset
+isbatches{S<:AbstractVector{Int}}(::Vector{S}) = true  # was: Vector{DataSubset}
 
 # --------------------------------------------------------------------
 
-Base.show(io::IO, iter::DataIterator) = print(io, "DataIterator{", typeof(iter.data), "}: ", iter.count, " elements with ", length(iter.start), " obs each")
+show_endstr(s::Int)                               = " observations" # eachobs
+show_endstr(s::UnitRange{Int})                    = string(" batches with ", length(s), " obs each")  # eachbatch
+show_endstr(s::AbstractVector{Int})               = " observations" # was: DataSubset
+show_endstr{S<:AbstractVector{Int}}(s::Vector{S}) = string(" batches with indices: ", s)  # was: Vector{DataSubset}
 
-Base.eltype{T,S,R}(::Type{DataIterator{T,S,R}}) = R
-Base.start(iter::DataIterator) = iter.start
-Base.done(iter::DataIterator, idx) = maximum(idx) > iter.count * length(iter.start)
-Base.next(iter::DataIterator, idx) = (datasubset(iter.data, idx), idx + length(iter.start))
+function Base.show(io::IO, iter::DataIterator)
+    print(io, "DataIterator{", typeof(iter.data), "}: ", iter.count, show_endstr(iter.start))
+end
+
+# Base.eltype{T,S,R}(::Type{DataIterator{T,S,R}}) = R
 
 Base.length(iter::DataIterator) = iter.count
 nobs(iter::DataIterator) = nobs(iter.data)
 
 Base.endof(iter::DataIterator) = iter.count
-Base.getindex(iter::DataIterator, batchindex) = datasubset(iter.data, (batchindex-1)*length(iter.start)+iter.start)
+Base.getindex(iter::DataIterator, batchindex) = viewobs(iter.data, (batchindex-1)*length(iter.start)+iter.start)
 getobs(iter::DataIterator, batchindex) = getobs(iter.data, (batchindex-1)*length(iter.start)+iter.start)
 getobs(iter::DataIterator) = getobs.(collect(iter))
+
+# --------------------------------------------------------------------
+# iteration
+
+# eachobs
+Base.start{T}(iter::DataIterator{T,Int}) = iter.start
+Base.done{T}(iter::DataIterator{T,Int}, idx) = idx > iter.count
+Base.next{T}(iter::DataIterator{T,Int}, idx) = (viewobs(iter.data, idx), idx + 1)
+
+# eachbatch
+Base.start{T}(iter::DataIterator{T,UnitRange{Int}}) = iter.start
+Base.done{T}(iter::DataIterator{T,UnitRange{Int}}, idx) = maximum(idx) > iter.count * length(iter.start)
+Base.next{T}(iter::DataIterator{T,UnitRange{Int}}, idx) = (viewobs(iter.data, idx), idx + length(iter.start))
+
+# was: DataSubset
+Base.start{T,S<:AbstractVector{Int}}(iter::DataIterator{T,S}) = 1
+Base.done{T,S<:AbstractVector{Int}}(iter::DataIterator{T,S}, idx) = idx > iter.count
+Base.next{T,S<:AbstractVector{Int}}(iter::DataIterator{T,S}, idx) = (viewobs(iter.data, iter.start[idx]), idx+1)
+
+# was: Vector{DataSubset}
+Base.start{T,S<:AbstractVector{Int}}(iter::DataIterator{T,Vector{S}}) = 1
+Base.done{T,S<:AbstractVector{Int}}(iter::DataIterator{T,Vector{S}}, idx) = idx > iter.count
+Base.next{T,S<:AbstractVector{Int}}(iter::DataIterator{T,Vector{S}}, idx) = (viewobs(iter.data, iter.start[idx]), idx+1)
+
+# --------------------------------------------------------------------
 
 """
     eachobs(source[...])
@@ -166,3 +203,12 @@ function eachbatch(source; size::Int = -1, count::Int = -1)
     DataIterator(source, 1:nsize, ncount)
 end
 
+# ----------------------------------------------------------------
+
+datasubset(data) = DataIterator(data)
+datasubset(data, indices) = DataIterator(data, indices, length(indices))
+
+# TODO:
+#datasubset(iter::DataIterator, args...)
+
+shuffled(data) = viewobs(data, shuffle(1:nobs(data)))

@@ -1,12 +1,16 @@
-# map DataSubset over the tuple instead
-function DataSubset(tup::Tuple, indices = 1:nobs(tup))
-    length(unique(map(_->nobs(_), tup))) == 1 || throw(DimensionMismatch("all parameters must have the same number of observations"))
-    map(data -> DataSubset(data, indices), tup)
-end
+# # map DataSubset over the tuple instead
+# function DataSubset(tup::Tuple, indices = 1:nobs(tup))
+#     length(unique(map(_->nobs(_), tup))) == 1 || throw(DimensionMismatch("all parameters must have the same number of observations"))
+#     map(data -> DataSubset(data, indices), tup)
+# end
 
 # map datasubset over the tuple instead
 datasubset(tup::Tuple, indices) = map(_ -> datasubset(_, indices), tup)
 datasubset(tup::Tuple) = map(_ -> datasubset(_), tup)
+
+# map viewobs over the tuple instead
+viewobs(tup::Tuple, indices) = map(_ -> viewobs(_, indices), tup)
+viewobs(tup::Tuple) = map(_ -> viewobs(_), tup)
 
 # add support for arbitrary tuples
 nobs(tup::Tuple) = nobs(tup[1])
@@ -36,4 +40,3 @@ for f in (:splitobs, :eachbatch, :batches, :infinite_batches,
         $f(tup; kw...)
     end
 end
-

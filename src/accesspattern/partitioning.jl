@@ -89,7 +89,8 @@ function batches(data; size::Int = -1, count::Int = -1)
         push!(lst, offset+1:offset+sz)
         offset += sz
     end
-    [datasubset(data, idx) for idx in lst]
+    # [datasubset(data, idx) for idx in lst]
+    DataIterator(data, lst, length(lst))
 end
 
 """
@@ -153,6 +154,6 @@ function splitobs(data; at = 0.7)
         push!(lst, n-nleft+1:n)
         lst
     end::Vector{UnitRange{Int}}
-    [datasubset(data, idx) for idx in idx_list]
+    # [datasubset(data, idx) for idx in idx_list]
+    DataIterator(data, idx_list, length(idx_list))
 end
-

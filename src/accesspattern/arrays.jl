@@ -1,9 +1,9 @@
 typealias NativeArray{T,N} Union{Array{T,N},SubArray{T,N}}
 
-datasubset(A::NativeArray) = A
+viewobs(A::NativeArray) = A
 
 # apply a view to the last dimension
-@generated function datasubset{T,N}(A::NativeArray{T,N}, idx)
+@generated function viewobs{T,N}(A::NativeArray{T,N}, idx)
     @assert N > 0
     if N == 1 && idx <: Integer
         :(A[idx])
@@ -25,4 +25,3 @@ getobs(A::AbstractArray) = A
         :(getindex(A,  $(fill(:(:),N-1)...), idx))
     end
 end
-
