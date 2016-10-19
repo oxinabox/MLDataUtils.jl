@@ -43,7 +43,10 @@ export
     eachbatch,
     shuffled,
     batches,
-    splitobs
+    isbatches,
+    splitobs,
+    infinite_obs,
+    infinite_batches
 
 include("feature_scaling.jl")
 include("basis_expansion.jl")

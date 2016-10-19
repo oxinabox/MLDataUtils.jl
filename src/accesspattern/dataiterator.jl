@@ -1,3 +1,8 @@
+
+abstract AbstractDataIterator{T,IB}
+isbatches{T,IB}(iter::AbstractDataIterator{T,IB}) = IB
+
+
 """
     DataIterator(data, start, count)
 
@@ -82,19 +87,21 @@ see also
 
 `DataSubset`, `eachbatch`, `eachobs`, `shuffled`, `getobs`, `nobs`
 """
-immutable DataIterator{T, S<:Union{Int,AbstractVector}}
+immutable DataIterator{T, S<:Union{Int,AbstractVector}, ISBATCHES} <: AbstractDataIterator{T,ISBATCHES}
     data::T
     start::S
     count::Int
 end
 
 DataIterator(data) = DataIterator(data, 1, nobs(data))
+function DataIterator(data, start, count)
+    DataIterator{typeof(data), typeof(start), isbatches(start)}(data,start,count)
+end
 # function DataIterator{T,S}(data::T, start::S = 1, count::Int = nobs(data))
 #     R = typeof(datasubset(data,start))
 #     DataIterator{T,S,R}(data,start,count)
 # end
 
-isbatches(iter::DataIterator) = isbatches(iter.start)
 
 isbatches(::Int)                               = false # eachobs
 isbatches(::UnitRange{Int})                    = true  # eachbatch
@@ -103,13 +110,18 @@ isbatches{S<:AbstractVector{Int}}(::Vector{S}) = true  # was: Vector{DataSubset}
 
 # --------------------------------------------------------------------
 
-show_endstr(s::Int)                               = " observations" # eachobs
-show_endstr(s::UnitRange{Int})                    = string(" batches with ", length(s), " obs each")  # eachbatch
-show_endstr(s::AbstractVector{Int})               = " observations" # was: DataSubset
-show_endstr{S<:AbstractVector{Int}}(s::Vector{S}) = string(" batches with indices: ", s)  # was: Vector{DataSubset}
+# show_endstr(s::Int)                               = " observations" # eachobs
+show_endstr(s::UnitRange{Int})                    = string(length(s), " obs each")  # eachbatch
+# show_endstr(s::AbstractVector{Int})               = " observations" # was: DataSubset
+show_endstr{S<:AbstractVector{Int}}(s::Vector{S}) = string("indices: ", s)  # was: Vector{DataSubset}
 
 function Base.show(io::IO, iter::DataIterator)
-    print(io, "DataIterator{", typeof(iter.data), "}: ", iter.count, show_endstr(iter.start))
+    print(io, "DataIterator{", typeof(iter.data), "}: ", iter.count)
+    if isbatches(iter)
+        print(io, " batches with ", show_endstr(iter.start))
+    else
+        print(io, " observations")
+    end
 end
 
 # Base.eltype{T,S,R}(::Type{DataIterator{T,S,R}}) = R
@@ -212,3 +224,24 @@ datasubset(data, indices) = DataIterator(data, indices, length(indices))
 #datasubset(iter::DataIterator, args...)
 
 shuffled(data) = viewobs(data, shuffle(1:nobs(data)))
+
+# ----------------------------------------------------------------
+# infinite iterators
+
+type InfiniteIterator{T,IB} <: AbstractDataIterator{T,IB}
+    data::T
+    func::Function
+end
+
+nobs(iter::InfiniteIterator) = nobs(iter.data)
+Base.start(iter::InfiniteIterator) = 1
+Base.done(iter::InfiniteIterator, idx) = false
+Base.next(iter::InfiniteIterator, idx) = (iter.func(iter.data), 1)
+
+function infinite_obs(data)
+    InfiniteIterator{typeof(data),false}(data, data -> viewobs(data, rand(1:nobs(data))))
+end
+
+function infinite_batches(data; size=1)
+    InfiniteIterator{typeof(data),true}(data, data -> viewobs(data, rand(1:nobs(data), size)))
+end
